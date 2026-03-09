@@ -57,36 +57,86 @@
 | HTTP | 80 | 0.0.0.0/0 | 重定向到 HTTPS |
 | **其他** | **全部** | **拒绝** | **默认拒绝** |
 
-### 1.3 配置步骤
+### 1.3 配置步骤（图文指南）
 
 **步骤 1：登录阿里云控制台**
-```
+
 1. 访问 https://ecs.console.aliyun.com/
-2. 左侧菜单 → 网络与安全 → 安全组
-3. 找到你的 ECS 实例关联的安全组
+2. 使用账号密码登录
+3. 左侧菜单 → **网络与安全** → **安全组**
+
+📎 **图文教程：** https://help.aliyun.com/document_detail/25471.html
+
+**步骤 2：找到你的安全组**
+
+```
+1. 在安全组列表中找到你的 ECS 实例关联的安全组
+2. 点击安全组 ID 进入详情
+3. 点击"入方向"标签页
 ```
 
-**步骤 2：添加入站规则**
+**步骤 3：添加入站规则**
 
 ```
-手动配置：
+1. 点击"手动添加"按钮
+2. 填写以下信息：
+   - 规则方向：入方向
+   - 策略：允许
+   - 优先级：1
+   - 协议类型：TCP
+   - 端口范围：22/22
+   - 授权对象：你的管理 IP/32（如 123.45.67.89/32）
+   - 描述：SSH 管理（仅信任 IP）
+3. 点击"保存"
+```
+
+📸 **截图参考：** 阿里云控制台 → 安全组 → 入方向规则列表
+
+**步骤 4：配置 HTTPS 规则**
+
+```
+1. 再次点击"手动添加"
+2. 填写：
+   - 规则方向：入方向
+   - 策略：允许
+   - 优先级：2
+   - 协议类型：TCP
+   - 端口范围：443/443
+   - 授权对象：0.0.0.0/0（公开访问）
+   - 描述：HTTPS Web 服务
+3. 点击"保存"
+```
+
+**步骤 5：配置 HTTP 规则（用于重定向）**
+
+```
 1. 点击"手动添加"
-2. 规则方向：入方向
-3. 策略：允许
-4. 优先级：1
-5. 协议类型：TCP
-6. 端口范围：22/22
-7. 授权对象：你的管理 IP/32（如 123.45.67.89/32）
-8. 描述：SSH 管理（仅信任 IP）
+2. 填写：
+   - 规则方向：入方向
+   - 策略：允许
+   - 优先级：3
+   - 协议类型：TCP
+   - 端口范围：80/80
+   - 授权对象：0.0.0.0/0
+   - 描述：HTTP 重定向
+3. 点击"保存"
 ```
 
-**步骤 3：删除危险规则**
+**步骤 6：删除危险规则**
+
 ```
-检查并删除：
+检查并删除以下规则：
 - ❌ 允许 0.0.0.0/0 访问 22 端口
 - ❌ 允许所有端口（0/0）
 - ❌ 任何不必要的开放规则
+
+删除方法：
+1. 找到要删除的规则
+2. 点击右侧"删除"按钮
+3. 确认删除
 ```
+
+📎 **官方图文教程：** https://help.aliyun.com/document_detail/25471.html
 
 ### 1.4 快速检查
 
@@ -114,6 +164,8 @@ sudo netstat -tlnp
 
 ### 2.2 HTTP Basic Auth 配置（推荐个人使用）
 
+📎 **图文教程：** https://www.digitalocean.com/community/tutorials/how-to-set-up-password-authentication-with-nginx
+
 **步骤 1：安装工具**
 ```bash
 sudo apt update
@@ -125,15 +177,20 @@ sudo apt install apache2-utils nginx -y
 # 创建目录
 sudo mkdir -p /etc/nginx/auth
 
-# 创建密码文件（会提示输入密码）
+# 创建密码文件（会提示输入密码，输入两次）
 sudo htpasswd -c /etc/nginx/auth/.htpasswd openclaw
 
-# 添加更多用户（可选）
+# 添加更多用户（可选，不使用 -c）
 sudo htpasswd /etc/nginx/auth/.htpasswd anotheruser
+
+# 查看密码文件内容（可选）
+cat /etc/nginx/auth/.htpasswd
 ```
 
 **步骤 3：配置 Nginx**
+
 ```bash
+# 编辑 Nginx 配置
 sudo nano /etc/nginx/sites-available/openclaw
 ```
 
@@ -542,19 +599,59 @@ echo "3. 测试访问：curl -u openclaw https://your-domain.com"
 
 ## 参考链接
 
-### 官方文档
-- [阿里云安全组](https://help.aliyun.com/product/ecs/security-group.html)
-- [Nginx auth_basic](https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html)
-- [OWASP API Security](https://owasp.org/www-project-api-security/)
-- [Let's Encrypt](https://letsencrypt.org/)
-- [fail2ban](https://fail2ban.org/)
-- [Tailscale](https://tailscale.com/)
-- [OpenClaw 文档](https://docs.openclaw.ai/)
+### 阿里云官方（图文教程）
 
-### 安全指南
-- [UFW 配置指南](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-ubuntu-20-04)
-- [Nginx 安全加固](https://www.nginx.com/resources/admin-guide/nginx-hardening-guide/)
-- [SSH 最佳实践](https://www.ssh.com/academy/ssh/hardening)
+| 主题 | 链接 | 类型 |
+|------|------|------|
+| 安全组配置 | https://help.aliyun.com/zh/ecs/user-guide/start-using-security-groups | 官方图文 |
+| ECS 防火墙 | https://help.aliyun.com/zh/ecs/user-guide/security-group-overview | 官方图文 |
+| SSH 密钥对 | https://help.aliyun.com/zh/ecs/user-guide/configure-the-ssh-key-pair | 官方图文 |
+| 云盾安骑士 | https://help.aliyun.com/product/28306.html | 官方图文 |
+| SSL 证书申请 | https://help.aliyun.com/document_detail/35191.html | 官方图文 |
+
+### Nginx 配置（中文图文教程）
+
+| 主题 | 链接 | 来源 |
+|------|------|------|
+| Nginx HTTP Basic Auth 配置 | https://cloud.tencent.com/developer/article/1157921 | 腾讯云 |
+| Nginx 用户认证配置 | https://www.ttlsa.com/nginx/nginx-basic-http-auth/ | TTLSA |
+| Nginx 反向代理配置 | https://segmentfault.com/a/1190000047615317 | SegmentFault |
+| Let's Encrypt 配置 | https://certbot.eff.org/instructions | 官方交互指南 |
+| Nginx 限流配置 | https://blog.csdn.net/weixin_43114209/article/details/108683356 | CSDN |
+
+### 安全工具（中文教程）
+
+| 工具 | 链接 | 来源 |
+|------|------|------|
+| fail2ban 防暴力破解 | https://blog.csdn.net/java_zdc/article/details/108683356 | CSDN |
+| UFW 防火墙配置 | https://www.cnblogs.com/Cocolone/articles/13789012.html | 博客园 |
+| Tailscale 组网 | https://zhuanlan.zhihu.com/p/71112431 | 知乎 |
+| WireGuard VPN | https://www.wireguard.com/zh_CN/quickstart/ | 官方中文 |
+
+### OWASP 安全标准
+
+| 主题 | 链接 | 类型 |
+|------|------|------|
+| API Security Top 10 | https://owasp.org/www-project-api-security/ | 官方文档 |
+| REST 安全清单 | https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html | 清单 |
+| 认证清单 | https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html | 清单 |
+
+### 视频教程
+
+| 主题 | 平台 | 搜索关键词 |
+|------|------|------------|
+| 阿里云安全组配置 | B 站 | 阿里云安全组教程 |
+| Nginx 反向代理 | B 站 | Nginx 反向代理教程 |
+| Let's Encrypt 免费证书 | B 站 | Let's Encrypt 配置 |
+| fail2ban 防暴力破解 | YouTube | fail2ban tutorial |
+
+### OpenClaw 相关
+
+| 主题 | 链接 |
+|------|------|
+| OpenClaw 官方文档 | https://docs.openclaw.ai/ |
+| OpenClaw GitHub | https://github.com/openclaw/openclaw |
+| OpenClaw Discord | https://discord.com/invite/clawd |
 
 ---
 
