@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案 C：时间线穿梭 Demo - 记忆宫殿</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+    }
+
+    #canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    #ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    #ui h1 {
+      color: white;
+      font-size: 24px;
+      text-shadow: 0 2px 10px rgba(138, 43, 226, 0.5);
+      pointer-events: auto;
+    }
+
+    #timeline-controls {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(10px);
+      padding: 20px 40px;
+      border-radius: 30px;
+      z-index: 100;
+      border: 1px solid rgba(138, 43, 226, 0.3);
+      width: 80%;
+      max-width: 800px;
+    }
+
+    #timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    #timeline-slider {
+      width: 100%;
+      height: 8px;
+      -webkit-appearance: none;
+      background: linear-gradient(90deg, #8a2be2, #e94560, #00d9ff);
+      border-radius: 4px;
+      outline: none;
+    }
+
+    #timeline-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(255,255,255,0.5);
+      transition: transform 0.2s;
+    }
+
+    #timeline-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    #current-time {
+      text-align: center;
+      color: white;
+      font-size: 18px;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    #memory-modal {
+      position: fixed;
+      right: -500px;
+      top: 0;
+      width: 500px;
+      height: 100vh;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(20px);
+      border-left: 1px solid rgba(138, 43, 226, 0.3);
+      padding: 40px;
+      transition: right 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 200;
+      overflow-y: auto;
+    }
+
+    #memory-modal.active {
+      right: 0;
+    }
+
+    #memory-modal h2 {
+      color: #e94560;
+      font-size: 28px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+    }
+
+    #memory-modal .date {
+      color: rgba(255,255,255,0.5);
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    #memory-modal .tags {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    #memory-modal .tag {
+      background: linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(233, 69, 96, 0.3));
+      color: #c77dff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      border: 1px solid rgba(138, 43, 226, 0.3);
+    }
+
+    #memory-modal .content {
+      color: rgba(255,255,255,0.8);
+      line-height: 1.8;
+      font-size: 16px;
+    }
+
+    #memory-modal .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.3s;
+    }
+
+    #memory-modal .close-btn:hover {
+      background: rgba(233, 69, 96, 0.5);
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+    }
+
+    #filters {
+      position: fixed;
+      top: 80px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .filter-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s;
+      backdrop-filter: blur(10px);
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      background: rgba(138, 43, 226, 0.5);
+      border-color: rgba(138, 43, 226, 0.8);
+      box-shadow: 0 0 20px rgba(138, 43, 226, 0.4);
+    }
+
+    #search-box {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 25px;
+      padding: 10px 20px;
+      color: white;
+      width: 250px;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s;
+    }
+
+    #search-box:focus {
+      outline: none;
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(138, 43, 226, 0.5);
+      width: 300px;
+    }
+
+    #search-box::placeholder {
+      color: rgba(255,255,255,0.5);
+    }
+
+    .star-hint {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(138, 43, 226, 0.8);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .star-hint.visible {
+      opacity: 1;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      color: white;
+      transition: opacity 0.5s;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #loading h1 {
+      font-size: 48px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #e94560, #8a2be2, #00d9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .loader {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(138, 43, 226, 0.3);
+      border-top-color: #e94560;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 加载界面 -->
+  <div id="loading">
+    <h1>🌌 记忆星河</h1>
+    <div class="loader"></div>
+    <p style="margin-top: 20px; opacity: 0.7;">正在生成记忆星图...</p>
+  </div>
+
+  <!-- UI -->
+  <div id="ui">
+    <h1>🌌 记忆宫殿 - 方案 C Demo</h1>
+    <input type="text" id="search-box" placeholder="🔍 搜索记忆...">
+  </div>
+
+  <!-- 筛选器 -->
+  <div id="filters">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="英语">英语</button>
+    <button class="filter-btn" data-filter="历史">历史</button>
+    <button class="filter-btn" data-filter="科学">科学</button>
+    <button class="filter-btn" data-filter="重要">⭐ 重要</button>
+  </div>
+
+  <!-- 时间线控制 -->
+  <div id="timeline-controls">
+    <div id="timeline-labels">
+      <span>过去</span>
+      <span>时间线</span>
+      <span>现在</span>
+    </div>
+    <input type="range" id="timeline-slider" min="0" max="100" value="50">
+    <div id="current-time">2026 年 3 月</div>
+  </div>
+
+  <!-- 记忆提示 -->
+  <div class="star-hint" id="star-hint">
+    ✨ 点击星星查看记忆
+  </div>
+
+  <!-- 记忆面板 -->
+  <div id="memory-modal">
+    <button class="close-btn" onclick="closeMemory()">×</button>
+    <h2 id="memory-title">记忆标题</h2>
+    <div class="date" id="memory-date">创建时间</div>
+    <div class="tags" id="memory-tags"></div>
+    <div class="content" id="memory-content">记忆内容...</div>
+  </div>
+
+  <!-- Canvas -->
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // 记忆数据（带时间戳）
+    const memories = [
+      { id: 1, title: '🍎 apple - 苹果', content: '名词，指一种常见的水果，也是科技公司的名字。', tags: ['英语', '词汇', '基础'], date: '2026-01-15', x: 0.2, y: 0.3, size: 8, color: '#8a2be2' },
+      { id: 2, title: '🍌 banana - 香蕉', content: '名词，长条形的黄色水果，富含钾元素。', tags: ['英语', '词汇', '水果'], date: '2026-01-20', x: 0.3, y: 0.4, size: 7, color: '#e94560' },
+      { id: 3, title: '👑 秦始皇', content: '中国第一个皇帝，统一六国，建立秦朝。', tags: ['历史', '中国', '皇帝'], date: '2026-02-01', x: 0.5, y: 0.2, size: 9, color: '#f39c12' },
+      { id: 4, title: '⚛️ 量子力学', content: '物理学分支，研究微观粒子的运动规律。', tags: ['科学', '物理', '前沿'], date: '2026-02-10', x: 0.6, y: 0.5, size: 10, color: '#00d9ff' },
+      { id: 5, title: '📚 learn - 学习', content: '动词，获取知识或技能的过程。', tags: ['英语', '词汇', '重要'], date: '2026-02-15', x: 0.4, y: 0.6, size: 8, color: '#8a2be2' },
+      { id: 6, title: '🏛️ 罗马帝国', content: '古代世界上最强大的帝国之一，公元前 27 年建立。', tags: ['历史', '世界', '帝国'], date: '2026-02-20', x: 0.7, y: 0.3, size: 9, color: '#f39c12' },
+      { id: 7, title: '🧬 DNA', content: '脱氧核糖核酸，生物体的遗传物质。', tags: ['科学', '生物', '遗传'], date: '2026-03-01', x: 0.5, y: 0.7, size: 8, color: '#00d9ff' },
+      { id: 8, title: '🎨 文艺复兴', content: '14-17 世纪欧洲的文化运动，复兴古希腊罗马文化。', tags: ['历史', '艺术', '欧洲'], date: '2026-03-05', x: 0.8, y: 0.4, size: 9, color: '#f39c12' },
+      { id: 9, title: '💻 Python', content: '高级编程语言，以简洁易读著称。', tags: ['科学', '编程', '重要'], date: '2026-03-08', x: 0.6, y: 0.8, size: 10, color: '#00d9ff' },
+      { id: 10, title: '🌟 universe - 宇宙', content: '名词，所有空间、时间、物质和能量的总和。', tags: ['英语', '科学', '重要'], date: '2026-03-09', x: 0.9, y: 0.5, size: 11, color: '#e94560' }
+    ];
+
+    // Canvas 设置
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // 星星（记忆）类
+    class Star {
+      constructor(memory) {
+        this.memory = memory;
+        this.x = memory.x * canvas.width;
+        this.y = memory.y * canvas.height;
+        this.baseSize = memory.size;
+        this.size = memory.size;
+        this.color = memory.color;
+        this.twinkle = Math.random() * Math.PI * 2;
+        this.visible = true;
+      }
+
+      update(time) {
+        // 闪烁效果
+        this.twinkle += 0.05;
+        this.size = this.baseSize + Math.sin(this.twinkle) * 2;
+      }
+
+      draw() {
+        if (!this.visible) return;
+
+        // 光晕
+        const gradient = ctx.createRadialGradient(
+          this.x, this.y, 0,
+          this.x, this.y, this.size * 3
+        );
+        gradient.addColorStop(0, this.color + '80');
+        gradient.addColorStop(0.5, this.color + '40');
+        gradient.addColorStop(1, 'transparent');
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // 核心
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+
+      isMouseOver(mx, my) {
+        const dx = this.x - mx;
+        const dy = this.y - my;
+        return Math.sqrt(dx * dx + dy * dy) < this.size * 2;
+      }
+    }
+
+    // 创建星星
+    let stars = memories.map(m => new Star(m));
+    let hoveredStar = null;
+
+    // 时间线
+    const slider = document.getElementById('timeline-slider');
+    const currentTime = document.getElementById('current-time');
+    let timeOffset = 0.5;
+
+    slider.addEventListener('input', (e) => {
+      timeOffset = e.target.value / 100;
+      const date = new Date(2026, Math.floor(timeOffset * 12), 1);
+      currentTime.textContent = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+      
+      // 根据时间过滤星星
+      const memoryIndex = Math.floor(timeOffset * memories.length);
+      stars.forEach((star, i) => {
+        star.visible = i <= memoryIndex + 2;
+      });
+    });
+
+    // 筛选器
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        const filter = btn.dataset.filter;
+        stars.forEach(star => {
+          if (filter === 'all') {
+            star.visible = true;
+          } else if (filter === '重要') {
+            star.visible = star.memory.tags.includes('重要');
+          } else {
+            star.visible = star.memory.tags.includes(filter);
+          }
+        });
+      });
+    });
+
+    // 鼠标交互
+    let mouseX = 0, mouseY = 0;
+
+    canvas.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+
+      hoveredStar = stars.find(star => star.isMouseOver(mouseX, mouseY) && star.visible);
+      
+      const hint = document.getElementById('star-hint');
+      hint.classList.toggle('visible', hoveredStar !== null);
+      canvas.style.cursor = hoveredStar ? 'pointer' : 'default';
+    });
+
+    canvas.addEventListener('click', () => {
+      if (hoveredStar) {
+        showMemory(hoveredStar.memory);
+      }
+    });
+
+    // 显示记忆
+    window.showMemory = function(mem) {
+      document.getElementById('memory-title').textContent = mem.title;
+      document.getElementById('memory-content').textContent = mem.content;
+      document.getElementById('memory-date').textContent = `📅 ${mem.date}`;
+      
+      const tagsContainer = document.getElementById('memory-tags');
+      tagsContainer.innerHTML = mem.tags.map(tag => 
+        `<span class="tag">#${tag}</span>`
+      ).join('');
+      
+      document.getElementById('memory-modal').classList.add('active');
+    }
+
+    // 关闭记忆
+    window.closeMemory = function() {
+      document.getElementById('memory-modal').classList.remove('active');
+    }
+
+    // 搜索
+    document.getElementById('search-box').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      stars.forEach(star => {
+        if (!query) {
+          star.visible = true;
+        } else {
+          star.visible = 
+            star.memory.title.toLowerCase().includes(query) ||
+            star.memory.content.toLowerCase().includes(query) ||
+            star.memory.tags.some(t => t.toLowerCase().includes(query));
+        }
+      });
+    });
+
+    // 动画循环
+    function animate() {
+      // 清空画布
+      ctx.fillStyle = 'rgba(15, 15, 26, 0.2)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 绘制星云背景
+      const time = Date.now() * 0.0001;
+      for (let i = 0; i < 5; i++) {
+        const x = (Math.sin(time + i) * 0.5 + 0.5) * canvas.width;
+        const y = (Math.cos(time * 0.8 + i) * 0.5 + 0.5) * canvas.height;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 200);
+        gradient.addColorStop(0, `rgba(138, 43, 226, ${0.1 + Math.sin(time + i) * 0.05})`);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // 更新和绘制星星
+      stars.forEach(star => {
+        star.update(Date.now());
+        star.draw();
+      });
+
+      // 绘制连线（相关记忆）
+      ctx.strokeStyle = 'rgba(138, 43, 226, 0.2)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < stars.length; i++) {
+        for (let j = i + 1; j < stars.length; j++) {
+          if (!stars[i].visible || !stars[j].visible) continue;
+          
+          const dx = stars[i].x - stars[j].x;
+          const dy = stars[i].y - stars[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < 200) {
+            ctx.beginPath();
+            ctx.moveTo(stars[i].x, stars[i].y);
+            ctx.lineTo(stars[j].x, stars[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 高亮悬停的星星
+      if (hoveredStar && hoveredStar.visible) {
+        ctx.beginPath();
+        ctx.arc(hoveredStar.x, hoveredStar.y, hoveredStar.size * 4, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // 启动
+    setTimeout(() => {
+      document.getElementById('loading').classList.add('hidden');
+      animate();
+    }, 1500);
+  </script>
+</body>
+</html>
