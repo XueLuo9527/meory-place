@@ -1,0 +1,47 @@
+{
+  "name": "second-brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your Second Brain - Store everything, retrieve anything intelligently",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.0.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "second-brain",
+    "knowledge-management",
+    "pkm",
+    "notes",
+    "productivity"
+  ],
+  "author": "XueLuo9527",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XueLuo9527/second-brain.git"
+  },
+  "bugs": {
+    "url": "https://github.com/XueLuo9527/second-brain/issues"
+  },
+  "homepage": "https://github.com/XueLuo9527/second-brain#readme"
+}
