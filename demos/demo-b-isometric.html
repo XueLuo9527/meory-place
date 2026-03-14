@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案 B：2.5D 等轴测视图 Demo - 记忆宫殿</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    #ui h1 {
+      color: white;
+      font-size: 24px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      pointer-events: auto;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      padding: 12px 20px;
+      border-radius: 30px;
+      color: white;
+      text-align: center;
+      z-index: 100;
+      border: 1px solid rgba(255,255,255,0.3);
+      font-size: 12px;
+      max-width: 90%;
+    }
+
+    #controls p {
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    @media (max-width: 768px) {
+      #controls {
+        bottom: 10px;
+        padding: 8px 15px;
+      }
+      #controls p {
+        font-size: 10px;
+      }
+    }
+
+    #viewport {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1000px;
+      overflow: hidden;
+    }
+
+    #palace-container {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      transform-style: preserve-3d;
+      transform: rotateX(60deg) rotateZ(-45deg) scale(0.8);
+      transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .room {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 
+        0 10px 30px rgba(0,0,0,0.2),
+        0 0 60px rgba(138, 43, 226, 0.1);
+    }
+
+    .room:hover {
+      transform: translateZ(30px) scale(1.05);
+      background: linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+      box-shadow: 
+        0 20px 60px rgba(0,0,0,0.3),
+        0 0 100px rgba(138, 43, 226, 0.3);
+    }
+
+    .room.active {
+      transform: translateZ(50px) scale(1.1);
+      background: linear-gradient(135deg, rgba(233, 69, 96, 0.4), rgba(138, 43, 226, 0.3));
+      border-color: rgba(233, 69, 96, 0.6);
+    }
+
+    .room-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
+    }
+
+    .room-name {
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+
+    .room-count {
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    /* 房间位置 */
+    .room-1 { top: 50px; left: 300px; }
+    .room-2 { top: 250px; left: 100px; }
+    .room-3 { top: 250px; left: 500px; }
+    .room-4 { top: 450px; left: 300px; }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+      #palace-container {
+        width: 100%;
+        height: 100%;
+        transform: rotateX(60deg) rotateZ(-45deg) scale(0.5);
+      }
+      .room {
+        width: 150px;
+        height: 150px;
+      }
+      .room-1 { top: 80px; left: 50%; transform: translateX(-50%); }
+      .room-2 { top: 200px; left: 10%; }
+      .room-3 { top: 200px; right: 10%; left: auto; }
+      .room-4 { top: 350px; left: 50%; transform: translateX(-50%); }
+      .room-icon { font-size: 36px; }
+      .room-name { font-size: 14px; }
+      .room-count { font-size: 11px; }
+      .memory-card {
+        width: 40px;
+        height: 60px;
+        font-size: 18px;
+      }
+    }
+
+    /* 连接路径 */
+    .path {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      height: 4px;
+      transform-origin: left center;
+    }
+
+    /* 记忆面板 */
+    #memory-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #memory-modal.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    #memory-content-box {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid rgba(138, 43, 226, 0.3);
+      transform: scale(0.8);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    #memory-modal.active #memory-content-box {
+      transform: scale(1);
+    }
+
+    #memory-content-box h2 {
+      color: #e94560;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    #memory-content-box .tags {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    #memory-content-box .tag {
+      background: rgba(138, 43, 226, 0.3);
+      color: #c77dff;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+
+    #memory-content-box .content {
+      color: rgba(255,255,255,0.8);
+      line-height: 1.8;
+      font-size: 16px;
+    }
+
+    #memory-content-box .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.3s;
+    }
+
+    #memory-content-box .close-btn:hover {
+      background: rgba(233, 69, 96, 0.5);
+    }
+
+    /* 浮动粒子 */
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-200px) scale(0.5);
+        opacity: 0;
+      }
+    }
+
+    /* 记忆卡片在房间内的展示 */
+    .memory-card {
+      position: absolute;
+      width: 60px;
+      height: 80px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 8px;
+      backdrop-filter: blur(5px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    .memory-card:hover {
+      transform: translateZ(40px) scale(1.2);
+      background: linear-gradient(135deg, rgba(233, 69, 96, 0.4), rgba(138, 43, 226, 0.3));
+      box-shadow: 0 10px 30px rgba(138, 43, 226, 0.4);
+    }
+
+    .memory-hint {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(138, 43, 226, 0.8);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 100;
+    }
+
+    .memory-hint.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- UI -->
+  <div id="ui">
+    <h1>🏰 记忆宫殿 - 方案 B Demo</h1>
+  </div>
+
+  <!-- 控制提示 -->
+  <div id="controls">
+    <p>🖱️ 操作说明</p>
+    <div style="margin-top: 8px;">
+      <span>点击房间进入</span> | <span>拖动旋转视角</span> | <span>滚轮缩放</span>
+    </div>
+  </div>
+
+  <!-- 记忆提示 -->
+  <div class="memory-hint" id="memory-hint">
+    点击记忆卡片查看详情
+  </div>
+
+  <!-- 记忆面板 -->
+  <div id="memory-modal">
+    <div id="memory-content-box">
+      <button class="close-btn" onclick="closeMemory()">×</button>
+      <h2 id="memory-title">记忆标题</h2>
+      <div class="tags" id="memory-tags"></div>
+      <div class="content" id="memory-content">记忆内容...</div>
+    </div>
+  </div>
+
+  <!-- 主场景 -->
+  <div id="viewport">
+    <div id="palace-container">
+      <!-- 连接路径 -->
+      <div class="path" style="top: 170px; left: 320px; width: 180px; transform: rotate(60deg);"></div>
+      <div class="path" style="top: 170px; left: 480px; width: 180px; transform: rotate(-60deg);"></div>
+      <div class="path" style="top: 370px; left: 120px; width: 180px; transform: rotate(-60deg);"></div>
+      <div class="path" style="top: 370px; left: 500px; width: 180px; transform: rotate(60deg);"></div>
+
+      <!-- 房间 -->
+      <div class="room room-1" data-room="1">
+        <div class="room-icon">📚</div>
+        <div class="room-name">英语学习</div>
+        <div class="room-count">5 个记忆</div>
+        
+        <!-- 记忆卡片 -->
+        <div class="memory-card" style="top: -30px; right: -20px;" data-memory="1">🍎</div>
+        <div class="memory-card" style="bottom: -30px; left: -20px;" data-memory="2">🍌</div>
+      </div>
+
+      <div class="room room-2" data-room="2">
+        <div class="room-icon">📜</div>
+        <div class="room-name">历史知识</div>
+        <div class="room-count">3 个记忆</div>
+        
+        <div class="memory-card" style="top: -30px; left: 50%;" data-memory="3">👑</div>
+      </div>
+
+      <div class="room room-3" data-room="3">
+        <div class="room-icon">🔬</div>
+        <div class="room-name">科学技术</div>
+        <div class="room-count">4 个记忆</div>
+        
+        <div class="memory-card" style="top: 50%; right: -30px;" data-memory="4">⚛️</div>
+      </div>
+
+      <div class="room room-4" data-room="4">
+        <div class="room-icon">🎨</div>
+        <div class="room-name">艺术文化</div>
+        <div class="room-count">2 个记忆</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 记忆数据
+    const memories = {
+      1: {
+        title: '🍎 apple - 苹果',
+        content: '名词，指一种常见的水果，也是科技公司的名字。例句：I eat an apple every day.（我每天吃一个苹果。）',
+        tags: ['英语', '词汇', '基础', '水果']
+      },
+      2: {
+        title: '🍌 banana - 香蕉',
+        content: '名词，长条形的黄色水果，富含钾元素。例句：Bananas are rich in potassium.（香蕉富含钾元素。）',
+        tags: ['英语', '词汇', '水果', '健康']
+      },
+      3: {
+        title: '👑 秦始皇',
+        content: '中国第一个皇帝，统一六国，建立秦朝（公元前 221 年）。他统一了文字、货币和度量衡，修建了长城。',
+        tags: ['历史', '中国', '皇帝', '秦朝']
+      },
+      4: {
+        title: '⚛️ 量子力学',
+        content: '物理学分支，研究微观粒子（如电子、光子）的运动规律。核心概念包括波粒二象性、不确定性原理、量子纠缠等。',
+        tags: ['科学', '物理', '前沿', '微观']
+      }
+    };
+
+    // 房间数据
+    const rooms = {
+      1: { name: '英语学习', memories: [1, 2] },
+      2: { name: '历史知识', memories: [3] },
+      3: { name: '科学技术', memories: [4] },
+      4: { name: '艺术文化', memories: [] }
+    };
+
+    // 房间点击
+    document.querySelectorAll('.room').forEach(room => {
+      room.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('memory-card')) {
+          document.querySelectorAll('.room').forEach(r => r.classList.remove('active'));
+          room.classList.add('active');
+        }
+      });
+    });
+
+    // 记忆卡片点击
+    document.querySelectorAll('.memory-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const memoryId = card.dataset.memory;
+        showMemory(memories[memoryId]);
+      });
+
+      card.addEventListener('mouseenter', () => {
+        document.getElementById('memory-hint').classList.add('visible');
+      });
+
+      card.addEventListener('mouseleave', () => {
+        document.getElementById('memory-hint').classList.remove('visible');
+      });
+    });
+
+    // 显示记忆
+    window.showMemory = function(mem) {
+      document.getElementById('memory-title').textContent = mem.title;
+      document.getElementById('memory-content').textContent = mem.content;
+      
+      const tagsContainer = document.getElementById('memory-tags');
+      tagsContainer.innerHTML = mem.tags.map(tag => 
+        `<span class="tag">#${tag}</span>`
+      ).join('');
+      
+      document.getElementById('memory-modal').classList.add('active');
+    }
+
+    // 关闭记忆
+    window.closeMemory = function() {
+      document.getElementById('memory-modal').classList.remove('active');
+    }
+
+    // 点击背景关闭
+    document.getElementById('memory-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'memory-modal') {
+        closeMemory();
+      }
+    });
+
+    // 拖动旋转（支持触摸）
+    let isDragging = false;
+    let startX, startY;
+    let rotateX = 60;
+    let rotateZ = -45;
+
+    const palaceContainer = document.getElementById('palace-container');
+
+    function handleStart(e) {
+      if (e.target.closest('.room') || e.target.closest('.memory-card')) return;
+      isDragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      startX = clientX;
+      startY = clientY;
+    }
+
+    function handleMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      const deltaX = clientX - startX;
+      const deltaY = clientY - startY;
+      
+      rotateZ += deltaX * 0.5;
+      rotateX = Math.max(30, Math.min(80, rotateX - deltaY * 0.5));
+      
+      updateTransform();
+      
+      startX = clientX;
+      startY = clientY;
+    }
+
+    function handleEnd() {
+      isDragging = false;
+    }
+
+    function updateTransform() {
+      const scale = window.innerWidth <= 768 ? 0.5 : 0.8;
+      palaceContainer.style.transform = `rotateX(${rotateX}deg) rotateZ(${rotateZ}deg) scale(${scale})`;
+    }
+
+    document.addEventListener('mousedown', handleStart);
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    
+    // 触摸支持
+    document.addEventListener('touchstart', handleStart, { passive: true });
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('touchend', handleEnd);
+
+    // 双指缩放
+    let initialPinchDistance = null;
+    let currentScale = 0.8;
+
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        initialPinchDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && initialPinchDistance) {
+        e.preventDefault();
+        const distance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const delta = distance - initialPinchDistance;
+        currentScale = Math.max(0.3, Math.min(1.2, currentScale + delta * 0.005));
+        palaceContainer.style.transform = `rotateX(${rotateX}deg) rotateZ(${rotateZ}deg) scale(${currentScale})`;
+        initialPinchDistance = distance;
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+      initialPinchDistance = null;
+    });
+
+    // 滚轮缩放
+    document.addEventListener('wheel', (e) => {
+      const scale = e.deltaY > 0 ? 0.95 : 1.05;
+      const currentScale = 0.8;
+      const newScale = Math.max(0.4, Math.min(1.2, currentScale * scale));
+      palaceContainer.style.transform = `rotateX(${rotateX}deg) rotateZ(${rotateZ}deg) scale(${newScale})`;
+    });
+
+    // 创建浮动粒子
+    function createParticles() {
+      for (let i = 0; i < 30; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + 'vw';
+        particle.style.top = Math.random() * 100 + 'vh';
+        particle.style.animationDelay = Math.random() * 8 + 's';
+        particle.style.width = (Math.random() * 4 + 2) + 'px';
+        particle.style.height = particle.style.width;
+        document.body.appendChild(particle);
+      }
+    }
+
+    createParticles();
+
+    // 房间弹跳进入动画
+    document.querySelectorAll('.room').forEach((room, i) => {
+      room.style.opacity = '0';
+      room.style.transform = 'translateY(50px)';
+      
+      setTimeout(() => {
+        room.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        room.style.opacity = '1';
+        room.style.transform = 'translateY(0)';
+      }, i * 100);
+    });
+  </script>
+</body>
+</html>
